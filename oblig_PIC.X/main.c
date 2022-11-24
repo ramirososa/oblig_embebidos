@@ -21,48 +21,49 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// #include <math.h>
+
 //clk real = 2MHZ -> 500ns -> 8bit entonces el reloj cuenta hasta 0.000128s prescalar 128 = 0.000001s
 //
 
 #define _XTAL_FREQ 8000000
-
+unsigned int velocidad = 340;
 int count=0;
-int contadorAlerta=0;
+unsigned char contadorAlerta=0;
+
 void trans(const char str[]){
 
 unsigned char transmitir;
 unsigned char i;
-// const char str[]="Bienvenido al sistema\n\0";
 transmitir=1;
 i=0;
-	while(transmitir){
-		TXREG=str[i];
-		if (TXREG==0)
-			transmitir=0;
-		else
-			i++;
-		while(TXIF==0); //me quedo esperando a que termine el byte
-	}
-
-
-   
+while(transmitir){
+TXREG=str[i];
+if (TXREG==0)
+transmitir=0;
+else
+i++;
+while(TXIF==0); //me quedo esperando a que termine el byte
+}
+ 
 }
 
 
 int sensor() {
-    
-    int timer;
-    // Resetear TIMER1 
+
+   unsigned long timer;
+   unsigned long time;
+    // Resetear TIMER1
         TMR1H = 0;
         TMR1L = 0;
-        
+       
         // PULSO 10us TRIG
         PORTAbits.RA0 = 1;
         __delay_us(100);
         PORTAbits.RA0 = 0;
-        
-        int espero=1;
+       
+        char espero=1;
+        char pasoTiempo=0; // paso tiempo es uno si estuve esperando ya 2000us por un pulso en RA1 y no ha llegado nada
+        // me permite no seguir esperando y protegerme en caso de echo desconectado.
         T1CONbits.TMR1ON = 1;  // cuento para ver si habra evento
         while(espero==1)
         {
@@ -70,43 +71,46 @@ int sensor() {
             {   espero=0;
                  TMR1H = 0;
                  TMR1L = 0;
-                 T1CONbits.TMR1ON = 1; 
+                 T1CONbits.TMR1ON = 1;
             }
             if(RA1==0)
             {
                  timer = (TMR1H << 8) | TMR1L;
                  if((timer) > 20000) // 1000 us equivale a 2000 aprox
                  {espero=0;
+                 pasoTiempo=1;
                  T1CONbits.TMR1ON = 0;
                  }
             }
         }
-        
-      /*  // Resetear TIMER1 
-        TMR1H = 0;
-        TMR1L = 0;
-        
-        T1CONbits.TMR1ON = 1; */
+        if(pasoTiempo==0)
+        {
         while(RA1==1)
         {  
         }
-        T1CONbits.TMR1ON = 0; 
-        
-        // LEER TIMER1 
-        timer = (TMR1H << 8) | TMR1L;
+        T1CONbits.TMR1ON = 0;
+       
+        // LEER TIMER1
+       
+         time = (TMR1H << 8) | TMR1L;
         // Distancia
-        timer = timer/(59*2)+1;
-        
-        // Mas preciso
-        //timer = (int)(sqrt(((timer*timer)/3460.2041)-6.25));
-       if(timer >=2 && timer <=400) {
+         timer = velocidad*time;
+         timer = timer / 40000;
+
+        if(timer >=2 && timer <=400) {
          char buffer[10];
          memset(buffer,10,0);
-         sprintf(buffer,"d=%d",timer);
+         sprintf(buffer,"%d",timer);  // Consume un monton de memoria
          trans(buffer);
-         trans("\n\0");
-       }
+         char bufferNuevo[10];
+         memset(bufferNuevo,10,0);
+         sprintf(bufferNuevo,"%d",velocidad);
+	 delay_ms(1000);
+         trans(bufferNuevo);
+        }
         return timer;
+        }
+        return 0;
 }
 
 void __interrupt() timer_isr(void){
@@ -117,22 +121,45 @@ void __interrupt() timer_isr(void){
         TMR0=6;
             if(count==2000)
             { // 2000 milis
-                count=0;
-              //  trans("Pasasron 2 segundos \n\0");
+               count=0;
                int distancia = sensor();
-               if(distancia<10)
+               if(distancia<30)
                    contadorAlerta++;
                else
                {
                    contadorAlerta=0;
-                   PORTB=0x00;
                }
-               if(contadorAlerta>4)
+               if(contadorAlerta==15)
+               {
                    PORTB=0xff;
+                 //trans("Alerta\n");
+               }
             }
     }
 }
 
+void guardar_EEPROM(unsigned int v){
+    EEADR = 0x00;
+    EEDATA = v-300;
+    EECON1bits.WREN = 1;
+    INTCONbits.GIE = 0;
+    EECON2 = 0x55;
+    EECON2 = 0xAA;
+    EECON1bits.WR = 1;
+    INTCONbits.GIE = 1;
+}
+
+
+unsigned int leer_EEPROM(){
+    unsigned int data;
+    EEADR = 0x00;
+    EECON1bits.RD = 1;
+    data = EEDATA;
+    data+=300;
+    if(data<300 || data>400)data=340;
+    EECON1bits.RD = 0;  
+    return data;
+}
 
 void main(){
     CMCONbits.CM = 0b111;
@@ -140,8 +167,6 @@ void main(){
     GIE = 1;
     PEIE = 1;
     T0IE = 1;
-
-
     BRGH=1;
     SPBRG=51;
     SPEN=1;
@@ -150,18 +175,76 @@ void main(){
     TX9=0;
     SYNC=0;
     TRISB = 6;
-   // PORTB = 0xff;
-    
+   
     // Ultrasonic sensor pins
     TRISAbits.TRISA0 = 0;  // TRIG pin
     TRISAbits.TRISA1 = 1;  // ECHO pin
-    
+   
     // Prescaler = 1:1
     T1CONbits.T1CKPS = 0b00;
     // Select internal clock (FOSC/4)
     T1CONbits.TMR1CS = 0;
-    while(1){
-        
-    }
    
+   
+   
+    // RECIBIR
+    velocidad = leer_EEPROM();
+
+    while(1)
+    {
+        unsigned char recibir;
+        unsigned char i;
+        char Buf[32];
+        recibir=1;
+        unsigned int velocidadNueva=0;
+        i=0;
+        unsigned int numeroActual;
+    while(recibir){
+        while(RCIF==0); // Loop Bytes
+        Buf[i]=RCREG;
+            if(RCREG>='0' && RCREG<='9') // Entra un digito
+            {
+                // trans("Entro un digito\n\0");
+                numeroActual= RCREG - 48;
+                velocidadNueva = velocidadNueva*10;
+                velocidadNueva += numeroActual;
+            }
+            else if (RCREG=='\r') // Entra un ENTER
+            {
+                recibir=0;
+                if(velocidadNueva>300 && velocidadNueva<400)
+                {
+                velocidad = velocidadNueva;
+                //trans("VS");
+                //char bufferNuevo[10];
+                //memset(bufferNuevo,10,0);
+                //sprintf(bufferNuevo,"%d",velocidad);
+                //trans(bufferNuevo);
+                //trans("\n");
+                guardar_EEPROM(velocidad);
+                }
+                else
+                {
+                   //trans("inv\n");
+                }
+            }
+            else if (RCREG=='x') // Apaga alarma
+            {
+                PORTB=0x00;
+                recibir =0;
+            }
+            else if (RCREG=='X') // Apaga alarma
+            {
+                PORTB=0x00;
+                recibir =0;
+            }
+            else // me ingresaron cualquier cosa
+            {
+                recibir=0;
+                //trans("Cinv\n\0");
+            }
+            i++;
+            if (i>=32) {recibir=0;} // Reviso no llenar buffer
+                    }
+    }
 }
