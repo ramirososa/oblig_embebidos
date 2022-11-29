@@ -91,5 +91,26 @@ def desplegarMedidas(desde, hasta):
                     a.append([line[0:10],line[11:13],line[15:18]])
     file1.close
     return(a)
-    #for b in a:
-        #return(b)
+
+
+def cortarlinea(l):
+    i=0
+    arr=[]
+    while(l[i]!=' ')
+        i++
+    i++
+    while(l[i]!=' ')
+        i++
+    i++
+    arr[0]=l[0:i]
+    aux = i-1
+    while(l[i]!=' ')
+        i++
+    i++
+    arr[1]=l[aux:i]
+    aux=i-1
+    while(l[i]!=' ')
+        i++
+    i++
+    arr[2]=l[aux:i]
+    return a
