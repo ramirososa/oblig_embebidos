@@ -34,7 +34,7 @@ def main():
             linea = ser.readline().decode('UTF-8').rstrip()
             ahora = datetime.now()
             tiempo = ("%s-%s-%s %s:%s:%s" % (ahora.year, ahora.month, ahora.day, ahora.hour, ahora.minute, ahora.second))
-            final = tiempo + velocidad + linea
+            final = ("%s %s %s" % (tiempo, velocidad, linea))
 
             with open('prueba.txt','a') as f:
                 f.write(final)
@@ -50,11 +50,11 @@ def main():
             #No funciona, pretendo mandar el velocidad-300, para que nos entre en un envio.
             #Habria que cambiar la recepcion del script en el pic para eso.
             velocidad = request.form.get("vel")
-            ser.write(b(int(velocidad[0:1])))
+            ser.write(velocidad[0:1].encode('utf-8'))
             time.sleep(1)
-            ser.write(b(int(velocidad[1:2])))
+            ser.write(velocidad[1:2].encode('utf-8'))
             time.sleep(1)
-            ser.write(b(int(velocidad[2:3])))
+            ser.write(velocidad[2:3].encode('utf-8'))
             time.sleep(1)
             ser.write(b("/r"))
             time.sleep(1)
