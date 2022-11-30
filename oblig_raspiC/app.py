@@ -126,3 +126,9 @@ with open('filename.txt', 'rb') as f:
     except OSError:
         f.seek(0)
     last_line = f.readline().decode()
+
+with open("myfile.txt", "rb") as file:
+    file.seek(-2, os.SEEK_END)
+    while file.read(1) != b'\n':
+        file.seek(-2, os.SEEK_CUR)
+    print(file.readline().decode())
