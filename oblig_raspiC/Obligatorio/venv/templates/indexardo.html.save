@@ -1,0 +1,27 @@
+<h1>Obligatorio 2</h1>
+
+<form action="{{ url_for("getFechas)}}" method="post">
+<label for="firstname">Desde:</label>
+<input type="text" id="desde" name="d">
+<label for="lastname">Hasta:</label>
+<input type="text" id="hasta" name="h">
+<button type="submit">Submit</button>
+
+
+<body> 
+<p> japon 2 - 1 alemania </p>
+
+<table>
+  <tr>
+    {% for header in headings %}
+    <th>{{ header }}</th>
+    {% endfor %}
+  </tr>
+  {% for row in data %}
+  <tr>
+      {{ row }}
+  </tr>
+  {% endfor %}
+</table>
+ </body>
+
